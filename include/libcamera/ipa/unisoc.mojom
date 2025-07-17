@@ -1,0 +1,36 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
+
+module ipa.unisoc;
+
+import "include/libcamera/ipa/core.mojom";
+
+struct IPAConfigInfo {
+	libcamera.IPACameraSensorInfo sensorInfo;
+	libcamera.ControlInfoMap sensorControls;
+};
+
+interface IPAUnisocInterface {
+	init(libcamera.IPASettings settings, IPAConfigInfo configInfo)
+		=> (int32 ret, libcamera.ControlInfoMap ipaControls);
+	start() => (int32 ret);
+	stop();
+
+	configure(IPAConfigInfo configInfo)
+		=> (int32 ret, libcamera.ControlInfoMap ipaControls);
+
+	mapBuffers(array<libcamera.IPABuffer> buffers, bool readOnly);
+	unmapBuffers(array<libcamera.IPABuffer> buffers);
+
+	[async] queueRequest(uint32 frame, libcamera.ControlList reqControls);
+	[async] computeParams(uint32 frame, uint32 dcamBufferId,
+			      uint32 lscBufferId, uint32 ispBufferId);
+	[async] processStats(uint32 frame, uint32 bufferId,
+			     libcamera.ControlList sensorControls);
+};
+
+interface IPAUnisocEventInterface {
+	paramsComputed(uint32 frame, uint32 dcamCfgSize, uint32 lscDataSize,
+		       uint32 ispCfgSize);
+	statsProcessed(uint32 frame, libcamera.ControlList metadata);
+	setSensorControls(libcamera.ControlList sensorControls);
+};
