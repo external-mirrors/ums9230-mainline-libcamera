@@ -222,6 +222,7 @@ pipelines_support = {
     'rpi/pisp':     arch_arm,
     'rpi/vc4':      arch_arm,
     'simple':       ['any'],
+    'unisoc':       arch_arm,
     'uvcvideo':     ['any'],
     'vimc':         ['test'],
     'virtual':      ['test'],

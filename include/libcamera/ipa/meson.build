@@ -69,6 +69,7 @@ pipeline_ipa_mojom_mapping = {
     'rpi/pisp': 'raspberrypi.mojom',
     'rpi/vc4': 'raspberrypi.mojom',
     'simple': 'soft.mojom',
+    'unisoc': 'unisoc.mojom',
     'vimc': 'vimc.mojom',
 }
 
