@@ -134,7 +134,9 @@ public:
 
 	int initialize();
 
-	void updateControls(const ControlInfoMap &ipaControls);
+	void updateControls(const ControlInfoMap &ipaControls,
+			    Size maxOutputSize);
+	void applyCrop();
 
 	void dcamCfgBufferReady(FrameBuffer *buffer);
 	void dcamLscBufferReady(FrameBuffer *buffer);
@@ -177,6 +179,10 @@ public:
 
 	Size defaultSize_;
 	SizeRange processedSizeRange_;
+
+	Rectangle sensorCrop_;
+	Rectangle ispWindow_;
+	Rectangle crop_;
 
 private:
 	UnisocFrameInfo *findFrameInfo(unsigned int frame)
@@ -409,19 +415,56 @@ int UnisocCameraData::initialize()
 		return ret;
 	}
 
-	updateControls(ipaControls);
+	sensorCrop_ = ipaConfig.sensorInfo.analogCrop;
+	ispWindow_ = Rectangle(ipaConfig.sensorInfo.outputSize);
+	updateControls(ipaControls, ipaConfig.sensorInfo.outputSize);
 
 	return 0;
 }
 
-void UnisocCameraData::updateControls(const ControlInfoMap &ipaControls)
+void UnisocCameraData::updateControls(const ControlInfoMap &ipaControls,
+				      Size maxOutputSize)
 {
 	ControlInfoMap::Map controls;
 
 	for (const auto &c : ipaControls)
 		controls.emplace(c.first, c.second);
 
+	Rectangle ispMinCrop{ 0, 0, maxOutputSize / kMaxUpscaling };
+	Rectangle minCrop = ispMinCrop.transformedBetween(ispWindow_,
+							  sensorCrop_);
+	Size defaultSize = sensorCrop_.size()
+				      .boundedToAspectRatio(maxOutputSize);
+	int xCrop = (sensorCrop_.width - defaultSize.width) / 2;
+	int yCrop = (sensorCrop_.height - defaultSize.height) / 2;
+	Rectangle defaultCrop{
+		sensorCrop_.x + xCrop,
+		sensorCrop_.y + yCrop,
+		defaultSize
+	};
+
+	controls[&controls::ScalerCrop] =
+		ControlInfo(minCrop, sensorCrop_, defaultCrop);
+
+	crop_ = defaultCrop.transformedBetween(sensorCrop_, ispWindow_);
+
+	LOG(Unisoc, Debug)
+		<< "Default crop rectangle based on aspect ratio: " << crop_;
+
 	controlInfo_ = ControlInfoMap(std::move(controls), controls::controls);
+}
+
+void UnisocCameraData::applyCrop()
+{
+	for (UnisocISPStream &stream : streams_) {
+		UnisocISPContext *ctx = stream.context_;
+		if (!ctx)
+			continue;
+
+		ctx->input_->setSelection(V4L2_SEL_TGT_CROP, &crop_);
+	}
+
+	LOG(Unisoc, Debug) << "Configured crop rectangle: " << crop_;
 }
 
 void UnisocCameraData::dcamCfgBufferReady(FrameBuffer *buffer)
@@ -489,6 +532,12 @@ void UnisocCameraData::captureBufferReady(FrameBuffer *buffer)
 	request->_d()->metadata().set(controls::SensorTimestamp,
 				      buffer->metadata().timestamp);
 
+	const auto &crop = request->controls().get(controls::ScalerCrop);
+	if (crop) {
+		crop_ = crop->transformedBetween(sensorCrop_, ispWindow_);
+		applyCrop();
+	}
+
 	const Request::BufferMap &outBuffers = request->buffers();
 	for (auto &[stream, outBuffer] : outBuffers) {
 		UnisocISPContext *ctx = contextForStream(stream);
@@ -502,6 +551,9 @@ void UnisocCameraData::captureBufferReady(FrameBuffer *buffer)
 		ctx->input_->queueBuffer(buffer);
 		ctx->output_->queueBuffer(outBuffer);
 	}
+
+	request->_d()->metadata().set(controls::ScalerCrop,
+			crop_.transformedBetween(ispWindow_, sensorCrop_));
 
 	processingBuffers_.emplace(buffer, outBuffers.size());
 	if (info->ispCfgBuffer)
@@ -1067,6 +1119,8 @@ int PipelineHandlerUnisoc::configure(Camera *camera, CameraConfiguration *c)
 		}
 	}
 
+	Size maxOutputSize{};
+
 	for (unsigned int i = 0; i < config->size(); i++) {
 		StreamConfiguration &cfg = config->at(i);
 
@@ -1095,6 +1149,8 @@ int PipelineHandlerUnisoc::configure(Camera *camera, CameraConfiguration *c)
 
 		stream.context_->configure(&cfg, &captureFormat);
 		cfg.setStream(&stream);
+
+		maxOutputSize.expandTo(cfg.size);
 	}
 
 	ipa::unisoc::IPAConfigInfo ipaConfig;
@@ -1116,7 +1172,9 @@ int PipelineHandlerUnisoc::configure(Camera *camera, CameraConfiguration *c)
 		return ret;
 	}
 
-	data->updateControls(ipaControls);
+	data->sensorCrop_ = ipaConfig.sensorInfo.analogCrop;
+	data->updateControls(ipaControls, maxOutputSize);
+	data->applyCrop();
 
 	return 0;
 }
