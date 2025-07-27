@@ -753,6 +753,17 @@ public:
 };
 REGISTER_CAMERA_SENSOR_HELPER("ov64a40", CameraSensorHelperOv64a40)
 
+class CameraSensorHelperOv64b40 : public CameraSensorHelper
+{
+public:
+	CameraSensorHelperOv64b40()
+	{
+		blackLevel_ = 4096;
+		gain_ = AnalogueGainLinear{ 1, 0, 0, 128 };
+	}
+};
+REGISTER_CAMERA_SENSOR_HELPER("ov64b40", CameraSensorHelperOv64b40)
+
 class CameraSensorHelperOv8856 : public CameraSensorHelper
 {
 public:
