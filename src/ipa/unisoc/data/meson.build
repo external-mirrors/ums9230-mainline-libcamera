@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: CC0-1.0
 
 conf_files = files([
+    'ov64b40.yaml',
     'ov8856.yaml',
     'uncalibrated.yaml'
 ])
