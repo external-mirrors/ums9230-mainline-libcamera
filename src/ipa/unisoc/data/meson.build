@@ -3,6 +3,7 @@
 conf_files = files([
     'ov64b40.yaml',
     'ov8856.yaml',
+    's5k3p3.yaml',
     'uncalibrated.yaml'
 ])
 
