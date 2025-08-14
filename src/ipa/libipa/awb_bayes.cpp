@@ -283,15 +283,11 @@ std::optional<RGB<double>> AwbBayes::gainsFromColourTemperature(double colourTem
 
 AwbResult AwbBayes::calculateAwb(const AwbStats &stats, unsigned int lux)
 {
-	ipa::Pwl prior;
-	if (lux > 0) {
-		prior = priors_.getInterpolated(lux);
-		prior.map([](double x, double y) {
-			LOG(Awb, Debug) << "(" << x << "," << y << ")";
-		});
-	} else {
-		prior.append(0, 1.0);
-	}
+	ipa::Pwl prior = priors_.getInterpolated(lux);
+
+	prior.map([](double x, double y) {
+		LOG(Awb, Debug) << "(" << x << "," << y << ")";
+	});
 
 	double t = coarseSearch(prior, stats);
 	double r = ctR_.eval(t);
