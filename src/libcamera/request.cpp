@@ -362,9 +362,11 @@ void Request::Private::timeout()
  */
 Request::Request(Camera *camera, uint64_t cookie)
 	: Extensible(std::make_unique<Private>(camera)),
-	  controls_(camera->controls(), camera->_d()->validator()),
 	  cookie_(cookie), status_(RequestPending)
 {
+	controls_ = new ControlList(camera->controls(),
+				    camera->_d()->validator());
+
 	LIBCAMERA_TRACEPOINT(request_construct, this);
 
 	LOG(Request, Debug) << "Created request - cookie: " << cookie_;
@@ -373,6 +375,7 @@ Request::Request(Camera *camera, uint64_t cookie)
 Request::~Request()
 {
 	LIBCAMERA_TRACEPOINT(request_destroy, this);
+	delete controls_;
 }
 
 /**
@@ -403,7 +406,7 @@ void Request::reuse(ReuseFlag flags)
 
 	status_ = RequestPending;
 
-	controls_.clear();
+	controls_->clear();
 	_d()->metadata_.clear();
 }
 
